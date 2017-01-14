@@ -4,7 +4,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using Telegram.Bot;
+using Telegram.Bot.Types;
 
 namespace KuisBolaBot.WebJob
 {
@@ -43,6 +45,8 @@ namespace KuisBolaBot.WebJob
             bot.SendTextMessageAsync(chatId, "Permainan telah berhasil dimulai.").Wait();
 
             Join(chatId, userName);
+
+            Thread.Sleep(1000);
             SendQuestion(chatId);
         }
 
@@ -142,6 +146,9 @@ namespace KuisBolaBot.WebJob
                     sbQuestion.AppendLine(string.Format("{0}. {1}", choice.No, choice.Answer));
                 }
             }
+            sbQuestion.AppendLine();
+            sbQuestion.AppendLine(string.Format("Soal bernilai {0}", quiz.Type == QuestionType.MultipleChoice ? 1 : 3));
+            sbQuestion.AppendLine("*Reply soal ini untuk menjawab*");
 
             bot.SendTextMessageAsync(chatId, "Soal baru sedang dikirim...").Wait();
             if (!string.IsNullOrEmpty(quiz.ImageUrl))
@@ -150,6 +157,56 @@ namespace KuisBolaBot.WebJob
             }
             var message = bot.SendTextMessageAsync(chatId, sbQuestion.ToString()).Result;
             issuedQuestion.MessageId = message.MessageId;
+        }
+
+        public void Answer(Update update)
+        {
+            if (update.Message.ReplyToMessage == null)
+            {
+                return;
+            }
+
+            var game = GetCurrentGame(update.Message.Chat.Id);
+            if (game == null)
+            {
+                return;
+            }
+
+            var answeredQuestion = game.IssuedQuestions
+                .Where(q => q.MessageId == update.Message.ReplyToMessage.MessageId && q.Winner == null)
+                .FirstOrDefault();
+            if (answeredQuestion == null)
+            {
+                return;
+            }
+
+            var player = game.Players.Where(p => p.UserName == update.Message.From.Username).FirstOrDefault();
+            if (player == null)
+            {
+                bot.SendTextMessageAsync(
+                    update.Message.Chat.Id, 
+                    string.Format(
+                        "Maaf @{0}, Anda belum bergabung dalam permainan ini. Gunakan perintah /join untuk bergabung.", 
+                        update.Message.From.Username));
+
+                return;
+            }
+
+            if (string.Equals(answeredQuestion.Quiz.Answer, update.Message.Text, StringComparison.OrdinalIgnoreCase))
+            {
+                answeredQuestion.Winner = player.UserName;
+                answeredQuestion.AnsweredDate = DateTime.Now;
+                player.Point += answeredQuestion.Quiz.Type == QuestionType.MultipleChoice ? 1 : 3;
+
+                bot.SendTextMessageAsync(
+                    update.Message.Chat.Id,
+                    string.Format(
+                        "Selamat @{0}, Anda berhasil menjawab dengan tepat.",
+                        update.Message.From.Username));
+
+                Thread.Sleep(1000);
+                SendQuestion(update.Message.Chat.Id);
+            }
         }
 
         public void RunWorker()
@@ -181,7 +238,8 @@ namespace KuisBolaBot.WebJob
                 return;
             }
 
-            if ((DateTime.Now - game.CurrentQuizStartedDate).TotalMinutes >= 1)
+            if ((DateTime.Now - game.CurrentQuizStartedDate).TotalSeconds >= 30
+                && game.IssuedQuestions.Any(q => q.Quiz.Id == game.CurrentQuizId && q.Winner == null ))
             {
                 bot.SendTextMessageAsync(game.ChatId, "Waktu untuk menjawab telah habis. Lanjut ke soal berikutnya.").Wait();
                 SendQuestion(game.ChatId);
