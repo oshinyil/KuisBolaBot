@@ -106,5 +106,17 @@ namespace KuisBolaBot.WebJob
             var game = GetCurrentGame(chatId);
             games.Remove(game);
         }
+
+        public static string Join(long chatId, string userName)
+        {
+            var game = GetCurrentGame(chatId);
+            if (game.Players.Contains(userName))
+            {
+                return "EXISTS";
+            }
+
+            game.Players.Add(userName);
+            return "SUCCESS";
+        }
     }
 }

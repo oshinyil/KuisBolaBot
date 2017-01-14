@@ -11,11 +11,14 @@ namespace KuisBolaBot.WebJob.Models
         public Game()
         {
             QuestionAndWinners = new List<QuestionAndWinner>();
+            Players = new List<string>();
         }
 
         public ObjectId Id { get; set; }
 
         public long ChatId { get; set; }
+
+        public List<string> Players { get; set; }
 
         public List<QuestionAndWinner> QuestionAndWinners { get; set; }
 
@@ -35,7 +38,4 @@ namespace KuisBolaBot.WebJob.Models
             return QuestionAndWinners.Select(q => q.QuizId).ToList();
         }
     }
-
-    
-
 }

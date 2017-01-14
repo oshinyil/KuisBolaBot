@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Telegram.Bot;
 
@@ -91,38 +92,33 @@ namespace KuisBolaBot.WebJob
 
                             if (response == "SUCCESS")
                             {
-                                var question = GameManager.GenerateQuestion(update.Message.Chat.Id);
-                                if (!string.IsNullOrEmpty(question.ImageUrl))
-                                {
-                                    bot.SendPhotoAsync(update.Message.Chat.Id, question.ImageUrl).Wait();
-                                }
-                                bot.SendTextMessageAsync(update.Message.Chat.Id, question.Message).Wait();
+                                Join(bot, update.Message.Chat.Id, update.Message.From.Username);
+                                SendQuestion(bot, update.Message.Chat.Id);
                             }
                         }
-
-                        if (text == "/next")
+                        else if (text == "/next")
                         {
                             if (GameManager.HasGameStarted(update.Message.Chat.Id))
                             {
-                                var question = GameManager.GenerateQuestion(update.Message.Chat.Id);
-                                if (question == null)
-                                {
-                                    bot.SendTextMessageAsync(update.Message.Chat.Id, "Game ended.").Wait();
-                                }
-
-                                if (!string.IsNullOrEmpty(question.ImageUrl))
-                                {
-                                    bot.SendPhotoAsync(update.Message.Chat.Id, question.ImageUrl).Wait();
-                                }
-                                bot.SendTextMessageAsync(update.Message.Chat.Id, question.Message).Wait();
+                                SendQuestion(bot, update.Message.Chat.Id);
                             }
                             else
                             {
                                 bot.SendTextMessageAsync(update.Message.Chat.Id, "No game running. Please use command /start to start new game.").Wait();
                             }
                         }
-
-                        if (text == "/end")
+                        else if (text == "/join")
+                        {
+                            if (GameManager.HasGameStarted(update.Message.Chat.Id))
+                            {
+                                GameManager.Join(update.Message.Chat.Id, update.Message.From.Username);
+                            }
+                            else
+                            {
+                                bot.SendTextMessageAsync(update.Message.Chat.Id, "No game running. Please use command /start to start new game.").Wait();
+                            }
+                        }
+                        else if (text == "/end")
                         {
                             if (GameManager.HasGameStarted(update.Message.Chat.Id))
                             {
@@ -136,6 +132,43 @@ namespace KuisBolaBot.WebJob
                         }
                     }
                 }
+            }
+        }
+
+        public static void SendQuestion(TelegramBotClient bot, long chatId)
+        {
+            var question = GameManager.GenerateQuestion(chatId);
+            if (question == null)
+            {
+                bot.SendTextMessageAsync(chatId, "Sorry, no question available.").Wait();
+                return;
+            }
+
+            bot.SendTextMessageAsync(chatId, "New question is coming...").Wait();
+            Thread.Sleep(1000);
+            if (!string.IsNullOrEmpty(question.ImageUrl))
+            {
+                bot.SendPhotoAsync(chatId, question.ImageUrl).Wait();
+            }
+            var message = bot.SendTextMessageAsync(chatId, question.Message).Result;
+        }
+
+        public static void Join(TelegramBotClient bot, long chatId, string userName)
+        {
+            var response = GameManager.Join(chatId, userName);
+            if (response == "SUCCESS")
+            {
+                bot.SendTextMessageAsync(
+                    chatId,
+                    string.Format("@{0} has joined the game successfully.", userName)
+                    ).Wait();
+            }
+            else if(response == "EXISTS")
+            {
+                bot.SendTextMessageAsync(
+                    chatId,
+                    string.Format("@{0} already joined the game.", userName)
+                    ).Wait();
             }
         }
     }
