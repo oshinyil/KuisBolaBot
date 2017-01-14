@@ -10,7 +10,7 @@ namespace KuisBolaBot.WebJob.Models
     {
         public Game()
         {
-            QuestionAndWinners = new List<QuestionAndWinner>();
+            IssuedQuestions = new List<IssuedQuestion>();
             Players = new List<Player>();
         }
 
@@ -20,7 +20,7 @@ namespace KuisBolaBot.WebJob.Models
 
         public List<Player> Players { get; set; }
 
-        public List<QuestionAndWinner> QuestionAndWinners { get; set; }
+        public List<IssuedQuestion> IssuedQuestions { get; set; }
 
         [BsonIgnore]
         public ObjectId CurrentQuizId { get; set; }
@@ -28,7 +28,7 @@ namespace KuisBolaBot.WebJob.Models
         [BsonIgnore]
         public DateTime CurrentQuizStartedDate { get; set; }
 
-        public string Starter { get; set; }
+        public string StartedBy { get; set; }
 
         public DateTime StartDate { get; set; }
 
@@ -36,7 +36,7 @@ namespace KuisBolaBot.WebJob.Models
 
         public IEnumerable<ObjectId> GetPlayedQuizIds()
         {
-            return QuestionAndWinners.Select(q => q.QuizId).ToList();
+            return IssuedQuestions.Select(q => q.Quiz.Id).ToList();
         }
     }
 }

@@ -27,31 +27,23 @@ namespace KuisBolaBot.WebJob
 
         public void Start(long chatId, string userName)
         {
-            try
+            if (HasGameStarted(chatId))
             {
-                if (HasGameStarted(chatId))
-                {
-                    bot.SendTextMessageAsync(chatId, "Permainan sedang berlangsung.").Wait();
-                    return;
-                }
-
-                games.Add(new Game
-                {
-                    Id = new MongoDB.Bson.ObjectId(),
-                    ChatId = chatId,
-                    StartDate = DateTime.Now,
-                    Starter = userName
-                });
-                bot.SendTextMessageAsync(chatId, "Permainan telah berhasil dimulai.").Wait();
-
-                Join(chatId, userName);
-                SendQuestion(chatId);
-
+                bot.SendTextMessageAsync(chatId, "Permainan sedang berlangsung.").Wait();
+                return;
             }
-            catch (Exception ex)
+
+            games.Add(new Game
             {
-                bot.SendTextMessageAsync(chatId, "Maaf, permainan gagal dimulai.").Wait();
-            }
+                Id = new MongoDB.Bson.ObjectId(),
+                ChatId = chatId,
+                StartDate = DateTime.Now,
+                StartedBy = userName
+            });
+            bot.SendTextMessageAsync(chatId, "Permainan telah berhasil dimulai.").Wait();
+
+            Join(chatId, userName);
+            SendQuestion(chatId);
         }
 
         public void End(long chatId, string userName)
@@ -64,11 +56,11 @@ namespace KuisBolaBot.WebJob
                 return;
             }
 
-            if (game.Starter != userName)
+            if (game.StartedBy != userName)
             {
                 bot.SendTextMessageAsync(
                     chatId,
-                    string.Format("Maaf, hanya @{0} yang boleh menghentikan permainan.", game.Starter)
+                    string.Format("Maaf, hanya @{0} yang boleh menghentikan permainan.", game.StartedBy)
                 ).Wait();
                 return;
             }
@@ -117,26 +109,47 @@ namespace KuisBolaBot.WebJob
                 return;
             }
 
-            if (game.QuestionAndWinners.Count == 5)
+            if (game.IssuedQuestions.Count == 5)
             {
-                ShowWinner(game);
                 EndGame(game);
                 return;
             }
 
-            var question = GenerateQuestion(chatId);
-            if (question == null)
+            var quiz = GetRandomQuiz(game);
+            if (quiz == null)
             {
-                bot.SendTextMessageAsync(chatId, "Maaf, tidak ada soal yang tersedia.").Wait();
+                EndGame(game);
+                bot.SendTextMessageAsync(chatId, "Maaf, tidak ada soal yang tersedia. Permainan dihentikan.").Wait();
                 return;
             }
 
-            bot.SendTextMessageAsync(chatId, "Soal baru sedang dikirim...").Wait();
-            if (!string.IsNullOrEmpty(question.ImageUrl))
+            var issuedQuestion = new IssuedQuestion
             {
-                bot.SendPhotoAsync(chatId, question.ImageUrl).Wait();
+                Quiz = quiz,
+                CreatedDate = DateTime.Now
+            };
+
+            game.CurrentQuizId = issuedQuestion.Quiz.Id;
+            game.CurrentQuizStartedDate = issuedQuestion.CreatedDate;
+            game.IssuedQuestions.Add(issuedQuestion);
+
+            var sbQuestion = new StringBuilder();
+            sbQuestion.AppendLine(quiz.Question);
+            if (quiz.Type == QuestionType.MultipleChoice)
+            {
+                foreach (var choice in quiz.AnswerChoices.OrderBy(a => a.No))
+                {
+                    sbQuestion.AppendLine(string.Format("{0}. {1}", choice.No, choice.Answer));
+                }
             }
-            var message = bot.SendTextMessageAsync(chatId, question.Message).Result;
+
+            bot.SendTextMessageAsync(chatId, "Soal baru sedang dikirim...").Wait();
+            if (!string.IsNullOrEmpty(quiz.ImageUrl))
+            {
+                bot.SendPhotoAsync(chatId, quiz.ImageUrl).Wait();
+            }
+            var message = bot.SendTextMessageAsync(chatId, sbQuestion.ToString()).Result;
+            issuedQuestion.MessageId = message.MessageId;
         }
 
         public void RunWorker()
@@ -163,7 +176,7 @@ namespace KuisBolaBot.WebJob
         {
             Console.WriteLine("Game Id = {0}; Current Quiz Id = {1}", game.Id, game.CurrentQuizId);
 
-            if (game.QuestionAndWinners.Count == 0)
+            if (game.IssuedQuestions.Count == 0)
             {
                 return;
             }
@@ -202,24 +215,23 @@ namespace KuisBolaBot.WebJob
         }
 
 
-        private QuestionMessage GenerateQuestion(long chatId)
+        private QuestionMessage GenerateQuestion(Game game)
         {
             var question = new QuestionMessage();
 
-            var game = GetCurrentGame(chatId);
             var quiz = GetRandomQuiz(game);
 
             if (quiz == null)
             {
-                games.Remove(game);
-                bot.SendTextMessageAsync(chatId, "Soal telah habis. Permainan dihentikan.").Wait();
+                return null;
             }
 
             game.CurrentQuizId = quiz.Id;
             game.CurrentQuizStartedDate = DateTime.Now;
-            game.QuestionAndWinners.Add(new QuestionAndWinner
+            game.IssuedQuestions.Add(new IssuedQuestion
             {
-                QuizId = quiz.Id
+                Quiz = quiz,
+                CreatedDate = game.CurrentQuizStartedDate
             });
 
             var stringBuilder = new StringBuilder();
@@ -271,10 +283,24 @@ namespace KuisBolaBot.WebJob
 
         private void EndGame(Game game)
         {
+            ShowWinner(game);
             game.EndDate = DateTime.Now;
-            //TODO: save game to database
+            SaveGame(game);
             games.Remove(game);
             bot.SendTextMessageAsync(game.ChatId, "Permainan telah berakhir.").Wait();
+        }
+
+        private static void SaveGame(Game game)
+        {
+            try
+            {
+                var collection = db.GetCollection<Game>("Game");
+                collection.InsertOne(game);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Failed to save GameId = {0}. Exception = {1}", game.Id, ex.ToString());
+            }
         }
 
         #endregion
