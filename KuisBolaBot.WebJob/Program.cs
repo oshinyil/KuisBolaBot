@@ -10,6 +10,7 @@ namespace KuisBolaBot.WebJob
     public class Program
     {
         private static bool stopMe = false;
+        private static bool stopGame = false;
         private static List<int> updateIds = new List<int>();
 
         public static void Main(string[] args)
@@ -17,10 +18,11 @@ namespace KuisBolaBot.WebJob
             Console.WriteLine("Starting the bot...");
             Console.WriteLine();
 
-            var t = Task.Run(() => RunBot(Configuration.Instance["BotAccessToken"]));
+            var task = Task.Run(() => RunBot(Configuration.Instance["BotAccessToken"]));
 
             Console.ReadLine();
             stopMe = true;
+            stopGame = true;
         }
 
         public static void RunBot(string accessToken)
@@ -36,6 +38,9 @@ namespace KuisBolaBot.WebJob
                 return;
             }
             Console.WriteLine("{0} (@{1}) connected!", me.FirstName, me.Username);
+
+            var gameManager = new GameManager(bot);
+            var gameTask = Task.Run(() => RunGame(gameManager));
 
             Console.WriteLine();
             Console.WriteLine("Find @{0} in Telegram and send him a message - it will be displayed here", me.Username);
@@ -72,103 +77,31 @@ namespace KuisBolaBot.WebJob
 
                         if (text == "/start")
                         {
-                            var response = GameManager.Start(update.Message.Chat.Id);
-                            string replyMessage;
-                            switch (response)
-                            {
-                                case "SUCCESS":
-                                    replyMessage = "Game has been started successfully.";
-                                    break;
-                                case "EXISTS":
-                                    replyMessage = "Game is already running.";
-                                    break;
-                                case "FAILED":
-                                default:
-                                    replyMessage = "Failed to start a new game.";
-                                    break;
-                            }
-
-                            bot.SendTextMessageAsync(update.Message.Chat.Id, replyMessage).Wait();
-
-                            if (response == "SUCCESS")
-                            {
-                                Join(bot, update.Message.Chat.Id, update.Message.From.Username);
-                                SendQuestion(bot, update.Message.Chat.Id);
-                            }
+                            gameManager.Start(update.Message.Chat.Id, update.Message.From.Username);
                         }
                         else if (text == "/next")
                         {
-                            if (GameManager.HasGameStarted(update.Message.Chat.Id))
-                            {
-                                SendQuestion(bot, update.Message.Chat.Id);
-                            }
-                            else
-                            {
-                                bot.SendTextMessageAsync(update.Message.Chat.Id, "No game running. Please use command /start to start new game.").Wait();
-                            }
+                            gameManager.SendQuestion(update.Message.Chat.Id);
                         }
                         else if (text == "/join")
                         {
-                            if (GameManager.HasGameStarted(update.Message.Chat.Id))
-                            {
-                                GameManager.Join(update.Message.Chat.Id, update.Message.From.Username);
-                            }
-                            else
-                            {
-                                bot.SendTextMessageAsync(update.Message.Chat.Id, "No game running. Please use command /start to start new game.").Wait();
-                            }
+                            gameManager.Join(update.Message.Chat.Id, update.Message.From.Username);
                         }
                         else if (text == "/end")
                         {
-                            if (GameManager.HasGameStarted(update.Message.Chat.Id))
-                            {
-                                GameManager.EndGame(update.Message.Chat.Id);
-                                bot.SendTextMessageAsync(update.Message.Chat.Id, "Game ended.").Wait();
-                            }
-                            else
-                            {
-                                bot.SendTextMessageAsync(update.Message.Chat.Id, "No game running. Please use command /start to start new game.").Wait();
-                            }
+                            gameManager.End(update.Message.Chat.Id, update.Message.From.Username);
                         }
                     }
                 }
             }
         }
 
-        public static void SendQuestion(TelegramBotClient bot, long chatId)
+        public static void RunGame(GameManager gameManager)
         {
-            var question = GameManager.GenerateQuestion(chatId);
-            if (question == null)
+            while (!stopGame)
             {
-                bot.SendTextMessageAsync(chatId, "Sorry, no question available.").Wait();
-                return;
-            }
-
-            bot.SendTextMessageAsync(chatId, "New question is coming...").Wait();
-            Thread.Sleep(1000);
-            if (!string.IsNullOrEmpty(question.ImageUrl))
-            {
-                bot.SendPhotoAsync(chatId, question.ImageUrl).Wait();
-            }
-            var message = bot.SendTextMessageAsync(chatId, question.Message).Result;
-        }
-
-        public static void Join(TelegramBotClient bot, long chatId, string userName)
-        {
-            var response = GameManager.Join(chatId, userName);
-            if (response == "SUCCESS")
-            {
-                bot.SendTextMessageAsync(
-                    chatId,
-                    string.Format("@{0} has joined the game successfully.", userName)
-                    ).Wait();
-            }
-            else if(response == "EXISTS")
-            {
-                bot.SendTextMessageAsync(
-                    chatId,
-                    string.Format("@{0} already joined the game.", userName)
-                    ).Wait();
+                gameManager.RunWorker();
+                Thread.Sleep(1000);
             }
         }
     }

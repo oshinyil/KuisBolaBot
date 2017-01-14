@@ -11,23 +11,24 @@ namespace KuisBolaBot.WebJob.Models
         public Game()
         {
             QuestionAndWinners = new List<QuestionAndWinner>();
-            Players = new List<string>();
+            Players = new List<Player>();
         }
 
         public ObjectId Id { get; set; }
 
         public long ChatId { get; set; }
 
-        public List<string> Players { get; set; }
+        public List<Player> Players { get; set; }
 
         public List<QuestionAndWinner> QuestionAndWinners { get; set; }
 
         [BsonIgnore]
         public ObjectId CurrentQuizId { get; set; }
 
-        public string WinnerUserName { get; set; }
+        [BsonIgnore]
+        public DateTime CurrentQuizStartedDate { get; set; }
 
-        public int WinnerScore { get; set; }
+        public string Starter { get; set; }
 
         public DateTime StartDate { get; set; }
 
