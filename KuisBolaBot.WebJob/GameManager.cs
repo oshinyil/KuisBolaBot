@@ -214,42 +214,6 @@ namespace KuisBolaBot.WebJob
             bot.SendTextMessageAsync(game.ChatId, sbMessage.ToString()).Wait();
         }
 
-
-        private QuestionMessage GenerateQuestion(Game game)
-        {
-            var question = new QuestionMessage();
-
-            var quiz = GetRandomQuiz(game);
-
-            if (quiz == null)
-            {
-                return null;
-            }
-
-            game.CurrentQuizId = quiz.Id;
-            game.CurrentQuizStartedDate = DateTime.Now;
-            game.IssuedQuestions.Add(new IssuedQuestion
-            {
-                Quiz = quiz,
-                CreatedDate = game.CurrentQuizStartedDate
-            });
-
-            var stringBuilder = new StringBuilder();
-            stringBuilder.AppendLine(quiz.Question);
-            if (quiz.Type == QuestionType.MultipleChoice)
-            {
-                foreach (var choice in quiz.AnswerChoices.OrderBy(a => a.No))
-                {
-                    stringBuilder.AppendLine(string.Format("{0}. {1}", choice.No, choice.Answer));
-                }
-            }
-
-            question.Message = stringBuilder.ToString();
-            question.ImageUrl = quiz.ImageUrl;
-
-            return question;
-        }
-
         private static Quiz GetRandomQuiz(Game game)
         {
             var collection = db.GetCollection<Quiz>("Quiz");
