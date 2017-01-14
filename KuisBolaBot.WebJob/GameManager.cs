@@ -10,7 +10,7 @@ namespace KuisBolaBot.WebJob
     public class GameManager
     {
         private static string dbConnection = Configuration.Instance["DatabaseConnection"];
-        private static string dbName = Configuration.Instance["DATABASE_NAME"];
+        private static string dbName = Configuration.Instance["DatabaseName"];
 
         private static List<Game> games = new List<Game>();
         private static MongoClient client = new MongoClient(dbConnection);
