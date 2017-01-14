@@ -105,11 +105,33 @@ namespace KuisBolaBot.WebJob
                             if (GameManager.HasGameStarted(update.Message.Chat.Id))
                             {
                                 var question = GameManager.GenerateQuestion(update.Message.Chat.Id);
+                                if (question == null)
+                                {
+                                    bot.SendTextMessageAsync(update.Message.Chat.Id, "Game ended.").Wait();
+                                }
+
                                 if (!string.IsNullOrEmpty(question.ImageUrl))
                                 {
                                     bot.SendPhotoAsync(update.Message.Chat.Id, question.ImageUrl).Wait();
                                 }
                                 bot.SendTextMessageAsync(update.Message.Chat.Id, question.Message).Wait();
+                            }
+                            else
+                            {
+                                bot.SendTextMessageAsync(update.Message.Chat.Id, "No game running. Please use command /start to start new game.").Wait();
+                            }
+                        }
+
+                        if (text == "/end")
+                        {
+                            if (GameManager.HasGameStarted(update.Message.Chat.Id))
+                            {
+                                GameManager.EndGame(update.Message.Chat.Id);
+                                bot.SendTextMessageAsync(update.Message.Chat.Id, "Game ended.").Wait();
+                            }
+                            else
+                            {
+                                bot.SendTextMessageAsync(update.Message.Chat.Id, "No game running. Please use command /start to start new game.").Wait();
                             }
                         }
                     }

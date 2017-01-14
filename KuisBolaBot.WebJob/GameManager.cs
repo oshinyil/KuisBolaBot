@@ -51,6 +51,11 @@ namespace KuisBolaBot.WebJob
             var game = GetCurrentGame(chatId);
             var quiz = GetRandomQuiz(game);
 
+            if (quiz == null)
+            {
+                EndGame(chatId);
+            }
+
             game.CurrentQuizId = quiz.Id;
             game.QuestionAndWinners.Add(new QuestionAndWinner
             {
@@ -78,7 +83,12 @@ namespace KuisBolaBot.WebJob
             var collection = db.GetCollection<Quiz>("Quiz");
 
             var filter = Builders<Quiz>.Filter.Where(q => !game.GetPlayedQuizIds().Contains(q.Id));
-            var quizzes = collection.Find(filter).SortByDescending(q => q.CreatedDate).ToList();
+            var quizzes = collection.Find(filter).ToList();
+
+            if (quizzes == null || quizzes.Count == 0)
+            {
+                return null;
+            }
 
             var random = new Random();
             var quiz = quizzes[random.Next(quizzes.Count)];
@@ -89,6 +99,12 @@ namespace KuisBolaBot.WebJob
         private static Game GetCurrentGame(long chatId)
         {
             return games.Where(g => g.ChatId == chatId).FirstOrDefault();
+        }
+
+        public static void EndGame(long chatId)
+        {
+            var game = GetCurrentGame(chatId);
+            games.Remove(game);
         }
     }
 }
