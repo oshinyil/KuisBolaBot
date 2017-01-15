@@ -39,7 +39,7 @@ namespace KuisBolaBot.WebJob
 
             games.Add(new Game
             {
-                Id = new ObjectId(),
+                Id = ObjectId.GenerateNewId(),
                 ChatId = chatId,
                 StartDate = DateTime.Now,
                 StartedBy = userName
@@ -430,6 +430,7 @@ namespace KuisBolaBot.WebJob
                     {
                         table = new Table
                         {
+                            Id = ObjectId.GenerateNewId(),
                             UserName = player.UserName,
                             CreatedDate = DateTime.Now
                         };
