@@ -250,3 +250,5 @@ paket-files/
 # JetBrains Rider
 .idea/
 *.sln.iml
+/KuisBolaBot.WebJob/Properties/PublishProfiles/KuisBolaBot.WebJob-publish.ps1
+/KuisBolaBot.WebJob/Properties/PublishProfiles/publish-module.psm1
