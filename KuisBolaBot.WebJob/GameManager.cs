@@ -268,6 +268,24 @@ namespace KuisBolaBot.WebJob
             }
         }
 
+        public async void ShowHelp(long chatId)
+        {
+            var sbMessage = new StringBuilder();
+            sbMessage.AppendLine("Berikut ini adalah daftar perintah yang bisa anda gunakan:");
+            sbMessage.AppendLine("/start : memulai permainan baru");
+            sbMessage.AppendLine("/join : bergabung dengan permainan yang sedang berlangsung");
+            sbMessage.AppendLine("/end : mengakhiri permainan");
+            sbMessage.AppendLine("/next : mendapatkan soal berikutnya dan melewati soal yang sekarang");
+            sbMessage.AppendLine("/table : melihat klasmen sementara dari seluruh dunia");
+            sbMessage.AppendLine("/help : melihat bantuan yang tersedia");
+            sbMessage.AppendLine();
+            sbMessage.AppendLine("Jika anda mempunyai pertanyaan lain, ingin melaporkan bugs, atau ingin berkontribusi untuk KuisBolaBot, silakan hubungi @oshinyil.");
+            sbMessage.AppendLine();
+            sbMessage.AppendLine("Open source! https://github.com/oshinyil/KuisBolaBot");
+
+            await bot.SendTextMessageAsync(chatId, sbMessage.ToString());
+        }
+
         public void RunWorker()
         {
             if (games.Any())
