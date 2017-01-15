@@ -77,27 +77,27 @@ namespace KuisBolaBot.WebJob
                                 continue;
                             }
 
-                            if (text == "/start")
+                            if (text == "/start" || text == "/start@" + me.Username)
                             {
                                 gameManager.Start(update.Message.Chat.Id, update.Message.From.Username);
                             }
-                            else if (text == "/next")
+                            else if (text == "/next" || text == "/next@" + me.Username)
                             {
                                 gameManager.SendQuestion(update.Message.Chat.Id);
                             }
-                            else if (text == "/join")
+                            else if (text == "/join" || text == "/join@" + me.Username)
                             {
                                 gameManager.Join(update.Message.Chat.Id, update.Message.From.Username);
                             }
-                            else if (text == "/end")
+                            else if (text == "/end" || text == "/end@" + me.Username)
                             {
                                 gameManager.End(update.Message.Chat.Id, update.Message.From.Username);
                             }
-                            else if (text == "/table")
+                            else if (text == "/table" || text == "/table@" + me.Username)
                             {
                                 gameManager.ShowTable(update.Message.Chat.Id, update.Message.From.Username);
                             }
-                            else if (text == "/help")
+                            else if (text == "/help" || text == "/help@" + me.Username)
                             {
                                 gameManager.ShowHelp(update.Message.Chat.Id);
                             }
