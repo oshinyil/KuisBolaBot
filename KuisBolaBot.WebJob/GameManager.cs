@@ -1,10 +1,12 @@
 ﻿using KuisBolaBot.WebJob.Models;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 
@@ -37,7 +39,7 @@ namespace KuisBolaBot.WebJob
 
             games.Add(new Game
             {
-                Id = new MongoDB.Bson.ObjectId(),
+                Id = new ObjectId(),
                 ChatId = chatId,
                 StartDate = DateTime.Now,
                 StartedBy = userName
@@ -196,7 +198,7 @@ namespace KuisBolaBot.WebJob
             {
                 answeredQuestion.Winner = player.UserName;
                 answeredQuestion.AnsweredDate = DateTime.Now;
-                player.Point += answeredQuestion.Quiz.Type == QuestionType.MultipleChoice ? 1 : 3;
+                player.Points += answeredQuestion.Quiz.Type == QuestionType.MultipleChoice ? 1 : 3;
 
                 bot.SendTextMessageAsync(
                     update.Message.Chat.Id,
@@ -253,14 +255,14 @@ namespace KuisBolaBot.WebJob
         {
             var sbMessage = new StringBuilder();
 
-            var maxPoint = game.Players.Max(p => p.Point);
+            var maxPoint = game.Players.Max(p => p.Points);
             if (maxPoint <= 0)
             {
                 sbMessage.AppendLine("Tidak ada pemenang dalam permainan ini.");
             }
             else
             {
-                var winners = game.Players.Where(p => p.Point == maxPoint).ToList();
+                var winners = game.Players.Where(p => p.Points == maxPoint).ToList();
 
                 sbMessage.AppendLine(string.Format("Selamat, pemenang permainan ini dengan raihan {0} poin adalah:", maxPoint));
                 foreach (var winner in winners)
@@ -277,7 +279,7 @@ namespace KuisBolaBot.WebJob
             var collection = db.GetCollection<Quiz>("Quiz");
 
             var filter = Builders<Quiz>.Filter.Where(q => !game.GetPlayedQuizIds().Contains(q.Id));
-            var quizzes = collection.Find(filter).ToList();
+            var quizzes = collection.FindAsync(filter).Result.ToList();
 
             if (quizzes == null || quizzes.Count == 0)
             {
@@ -306,9 +308,14 @@ namespace KuisBolaBot.WebJob
         private void EndGame(Game game)
         {
             ShowWinner(game);
+
             game.EndDate = DateTime.Now;
             SaveGame(game);
+
+            Task.Run(() => UpdateTable(game.Players));
+
             games.Remove(game);
+
             bot.SendTextMessageAsync(game.ChatId, "Permainan telah berakhir.").Wait();
         }
 
@@ -317,11 +324,47 @@ namespace KuisBolaBot.WebJob
             try
             {
                 var collection = db.GetCollection<Game>("Game");
-                collection.InsertOne(game);
+                collection.InsertOneAsync(game);
             }
             catch (Exception ex)
             {
                 Console.WriteLine("Failed to save GameId = {0}. Exception = {1}", game.Id, ex.ToString());
+            }
+        }
+
+        private async void UpdateTable(IEnumerable<Player> players)
+        {
+            var collection = db.GetCollection<Table>("Table");
+
+            foreach (var player in players)
+            {
+                try
+                {
+                    var filter = Builders<Table>.Filter.Eq("UserName", player.UserName);
+                    var table = await collection.Find(filter).FirstOrDefaultAsync();
+
+                    if (table == null)
+                    {
+                        table = new Table
+                        {
+                            UserName = player.UserName,
+                            CreatedDate = DateTime.Now
+                        };
+                    }
+
+                    table.GamesPlayed += 1;
+                    table.Points += player.Points;
+                    table.UpdatedDate = DateTime.Now;
+
+                    await collection.ReplaceOneAsync(
+                        t => t.Id == table.Id,
+                        table,
+                        new UpdateOptions { IsUpsert = true });
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Failed to update table. Username = {0}. Exception = {1}", player.UserName, ex.ToString());
+                }
             }
         }
 
