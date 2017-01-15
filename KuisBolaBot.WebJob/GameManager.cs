@@ -33,7 +33,7 @@ namespace KuisBolaBot.WebJob
         {
             if (HasGameStarted(chatId))
             {
-                bot.SendTextMessageAsync(chatId, "Permainan sedang berlangsung.").Wait();
+                bot.SendTextMessageAsync(chatId, "Permainan KuisBolaBot sedang berlangsung.").Wait();
                 return;
             }
 
@@ -44,7 +44,7 @@ namespace KuisBolaBot.WebJob
                 StartDate = DateTime.Now,
                 StartedBy = userName
             });
-            bot.SendTextMessageAsync(chatId, "Permainan telah berhasil dimulai.").Wait();
+            bot.SendTextMessageAsync(chatId, "Permainan KuisBolaBot telah berhasil dimulai.").Wait();
 
             Join(chatId, userName);
 
@@ -211,6 +211,63 @@ namespace KuisBolaBot.WebJob
             }
         }
 
+        public async void ShowTable(long chatId, string username)
+        {
+            try
+            {
+                var sbMessage = new StringBuilder();
+                sbMessage.AppendLine("Klasmen sementara KuisBolaBot:");
+
+                var collection = db.GetCollection<Table>("Table");
+                var filter = Builders<Table>.Filter.Empty;
+                var tables = await collection.Find(filter).SortByDescending(t => t.Points).Limit(3).ToListAsync();
+
+                for (int i = 0; i < tables.Count; i++)
+                {
+                    sbMessage.AppendLine(
+                        string.Format("{0}. {1} (Main:{2} - Poin:{3})",
+                            i + 1,
+                            tables[i].UserName,
+                            tables[i].GamesPlayed,
+                            tables[i].Points
+                        )
+                    );
+                }
+
+                if (!tables.Any(t => t.UserName == username))
+                {
+                    filter = Builders<Table>.Filter.Eq("UserName", username);
+                    var table = await collection.Find(filter).FirstOrDefaultAsync();
+
+                    filter = Builders<Table>.Filter.Gt("Points", table.Points);
+                    long position = 1;
+                    position += await collection.Find(filter).CountAsync();
+
+                    if ((position - tables.Count) > 1)
+                    {
+                        sbMessage.AppendLine("...");
+                    }
+
+                    sbMessage.AppendLine(
+                        string.Format("{0}. {1} (Main:{2} - Poin:{3})",
+                            position,
+                            table.UserName,
+                            table.GamesPlayed,
+                            table.Points
+                        )
+                    );
+                }
+
+                await bot.SendTextMessageAsync(chatId, sbMessage.ToString());
+
+            }
+            catch (Exception ex)
+            {
+                await bot.SendTextMessageAsync(chatId, "Maaf, tidak dapat menampilkan klasmen sementara.");
+                Console.WriteLine("Failed to display table. Exception = {0}", ex.ToString());
+            }
+        }
+
         public void RunWorker()
         {
             if (games.Any())
@@ -276,20 +333,28 @@ namespace KuisBolaBot.WebJob
 
         private static Quiz GetRandomQuiz(Game game)
         {
-            var collection = db.GetCollection<Quiz>("Quiz");
-
-            var filter = Builders<Quiz>.Filter.Where(q => !game.GetPlayedQuizIds().Contains(q.Id));
-            var quizzes = collection.FindAsync(filter).Result.ToList();
-
-            if (quizzes == null || quizzes.Count == 0)
+            try
             {
+                var collection = db.GetCollection<Quiz>("Quiz");
+
+                var filter = Builders<Quiz>.Filter.Where(q => !game.GetPlayedQuizIds().Contains(q.Id));
+                var quizzes = collection.FindAsync(filter).Result.ToList();
+
+                if (quizzes == null || quizzes.Count == 0)
+                {
+                    return null;
+                }
+
+                var random = new Random();
+                var quiz = quizzes[random.Next(quizzes.Count)];
+
+                return quiz;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Failed to get random quiz. Exception = {0}", ex.ToString());
                 return null;
             }
-
-            var random = new Random();
-            var quiz = quizzes[random.Next(quizzes.Count)];
-
-            return quiz;
         }
 
         private static Game GetCurrentGame(long chatId)

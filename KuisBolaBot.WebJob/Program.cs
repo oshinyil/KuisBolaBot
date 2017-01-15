@@ -91,6 +91,10 @@ namespace KuisBolaBot.WebJob
                         {
                             gameManager.End(update.Message.Chat.Id, update.Message.From.Username);
                         }
+                        else if (text == "/table")
+                        {
+                            gameManager.ShowTable(update.Message.Chat.Id, update.Message.From.Username);
+                        }
                         else
                         {
                             gameManager.Answer(update);
